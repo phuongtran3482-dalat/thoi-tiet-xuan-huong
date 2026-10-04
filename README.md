@@ -30,7 +30,7 @@ Kho lịch sử được **GitHub Actions tự ghi mỗi ngày**, nên không ph
 3. **Cho phép Actions ghi vào repo:** *Settings → Actions → General → Workflow permissions* → chọn **Read and write permissions** → *Save*.
 4. **Chạy lần đầu:** tab **Actions** → *Cập nhật số giờ mưa hằng ngày* → **Run workflow**.
    - Để trống ô ngày → lấy 92 ngày gần nhất.
-   - Muốn có lịch sử dài hơn, nhập ngày bắt đầu, ví dụ `2020-01-01` (dữ liệu ERA5, có từ năm 1940).
+   - Muốn có lịch sử dài hơn, nhập ngày bắt đầu, ví dụ `2020-01-01` (ECMWF IFS từ 2017; trước đó dùng ERA5-Land, có từ 1950).
    Sau khi chạy xong, repo sẽ có thư mục `data/` với file JSON và CSV.
 5. **(Khuyến nghị) Bật GitHub Pages** để xem ứng dụng ở mọi nơi:
    *Settings → Pages → Source: Deploy from a branch → Branch: `main` / `(root)`* → *Save*.
@@ -54,10 +54,14 @@ historyUrls: [
 
 ## Ghi chú
 
-- “Số giờ mưa” = số giờ trong ngày có lượng mưa ≥ 0,1 mm (`precipitation_hours` của Open-Meteo) – là số liệu
-  **mô hình thời tiết** cho toạ độ trên, không phải trạm đo tại chỗ.
-- Cột `nguon` trong kho: `forecast` = dữ liệu hằng ngày từ Forecast API; `era5` = dữ liệu bổ sung từ kho lịch sử ERA5.
+- “Số giờ mưa” = số giờ trong ngày có lượng mưa ≥ 0,1 mm; “khung giờ mưa” = các giờ có mưa liên tục
+  (ví dụ `13:00-17:00`), theo giờ Việt Nam. Đây là số liệu **mô hình thời tiết** cho toạ độ trên, không phải trạm đo tại chỗ.
+- Nguồn kho: Open-Meteo Historical Weather API, mô hình **ECMWF IFS HRES 9 km** (mưa từng giờ, có từ 2017, cập nhật
+  mỗi 6 giờ). Ngày trước 2017 dùng ERA5-Land. Cột `nguon`: `ecmwf_ifs` hoặc `era5_land`.
+- Mỗi ngày trong kho gồm `hours` (số giờ mưa), `mm` (tổng lượng mưa) và `periods` = `[giờ bắt đầu, giờ kết thúc, mm]`.
   7 ngày gần nhất được ghi đè mỗi lần chạy để nhận số liệu hiệu chỉnh.
+- Muốn đối chiếu với số đo thực tế: trạm đo mưa tự động trên [Vrain](https://vrain.vn) (WATEC) và trạm khí tượng
+  Đà Lạt của Trung tâm Dự báo KTTV Quốc gia – hai nguồn này chưa có API công khai nên không tự động lấy được.
 - Lịch chạy của GitHub có thể trễ vài phút đến vài chục phút. Nếu lỡ một ngày cũng không sao: mỗi lần chạy
   đều quét lại 92 ngày gần nhất và điền các ngày còn thiếu.
 - Với repo Public, GitHub tự tắt lịch chạy nếu repo **không có hoạt động trong 60 ngày**. Nếu thấy tab Actions báo

@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       backfill_from:
-        description: 'Bổ sung dữ liệu cũ từ ngày (YYYY-MM-DD). Để trống nếu không cần.'
+        description: 'Bổ sung dữ liệu cũ từ ngày (YYYY-MM-DD, ECMWF IFS có từ 2017). Để trống nếu không cần.'
         required: false
         default: ''
 
@@ -23,13 +23,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
 
-      - name: Lấy số giờ mưa từ Open-Meteo
+      - name: Lấy số giờ và khung giờ mưa từ Open-Meteo (ECMWF IFS 9 km)
         env:
           BACKFILL_FROM: ${{ github.event.inputs.backfill_from }}
         run: node scripts/cap-nhat-mua.mjs

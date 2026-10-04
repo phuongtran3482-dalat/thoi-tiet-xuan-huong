@@ -69,6 +69,8 @@
   .big small { font-size: .35em; font-weight: 500; color: var(--muted); margin-left: 6px; letter-spacing: 0; }
   .expect { margin-top: 8px; font-size: 1rem; }
   .expect b { color: var(--accent); }
+  .periods { margin-top: 8px; font-size: .9rem; line-height: 1.6; }
+  td.per { font-size: .85rem; line-height: 1.45; }
   .hours { display: grid; grid-template-columns: repeat(24, 1fr); gap: 3px; margin-top: 16px; }
   .h { aspect-ratio: 1 / 1.7; border-radius: 4px; background: var(--l0); position: relative; }
   .h.rain { background: var(--accent); }
@@ -184,8 +186,9 @@
 
   <footer>
     <div id="archiveInfo"></div>
-    Dữ liệu: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> (mô hình thời tiết, không phải trạm đo tại chỗ).
-    “Số giờ mưa” = số giờ trong ngày có lượng mưa ≥ 0,1 mm.
+    Dữ liệu: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> – các ngày đã qua lấy từ mô hình ECMWF IFS 9 km (mưa từng giờ),
+    hôm nay và dự báo lấy từ mô hình tốt nhất cho khu vực. Đây là số liệu mô hình, không phải trạm đo tại chỗ.
+    “Số giờ mưa” = số giờ trong ngày có lượng mưa ≥ 0,1 mm; “khung giờ mưa” = các giờ có mưa liên tục, theo giờ Việt Nam.
     Ứng dụng tự cập nhật mỗi 30 phút, lúc 00:05 hằng ngày và mỗi khi bạn mở lại trang; dữ liệu các ngày đã qua được lưu lại trong trình duyệt để tích luỹ lịch sử.
   </footer>
 </div>
@@ -211,8 +214,11 @@
     ],
   };
   const VN_OFFSET = 7 * 3600e3; // Việt Nam UTC+7, không có giờ mùa hè
-  const K_ARCHIVE = 'xh-rain-archive-v1';
+  const RAIN_MM = 0.1;          // ngưỡng tính 1 giờ có mưa
+  // Lưu trữ: { 'YYYY-MM-DD': { h: số giờ mưa, p: [[giờ bắt đầu, giờ kết thúc, mm], ...], gh: 1 nếu từ kho GitHub } }
+  const K_ARCHIVE = 'xh-rain-archive-v2';
   const K_CACHE = 'xh-rain-cache-v1';
+  try { localStorage.removeItem('xh-rain-archive-v1'); } catch { /* bị chặn */ }
 
   const API = 'https://api.open-meteo.com/v1/forecast?' + new URLSearchParams({
     latitude: CFG.lat,
@@ -250,6 +256,40 @@
   const fmtStamp = (ts) => new Date(ts).toLocaleString('vi-VN', {
     timeZone: CFG.tz, hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric',
   });
+  const hh = (h) => `${pad(h)}:00`;
+  /** [[11, 14, 3.2], ...] -> "11:00–14:00 (3,2 mm), ..." */
+  function fmtPeriods(ps, withMm = true) {
+    if (!ps || !ps.length) return '';
+    return ps.map((p) => `${hh(p[0])}–${hh(p[1])}${withMm && p[2] != null ? ` (${fmtNum(p[2])} mm)` : ''}`).join(', ');
+  }
+  /** 24 giá trị mm (theo giờ bắt đầu) -> các khung giờ mưa liên tục. */
+  function toPeriods(mm) {
+    const out = [];
+    let cur = null;
+    mm.forEach((v, h) => {
+      if (v != null && v >= RAIN_MM) {
+        if (cur) { cur[1] = h + 1; cur[2] += v; } else { cur = [h, h + 1, v]; out.push(cur); }
+      } else cur = null;
+    });
+    out.forEach((p) => { p[2] = Math.round(p[2] * 10) / 10; });
+    return out;
+  }
+  /**
+   * Gom dữ liệu giờ của Open-Meteo theo ngày. Giá trị tại mốc hh:00 = mưa trong 1 giờ trước đó,
+   * nên mốc 15:00 được xếp vào ô giờ bắt đầu 14 (14:00–15:00), mốc 00:00 thuộc ô 23 của ngày trước.
+   */
+  function hourlyByDate(data) {
+    const map = new Map();
+    if (!data?.hourly) return map;
+    const { time, precipitation: pr, precipitation_probability: pp } = data.hourly;
+    time.forEach((t, i) => {
+      const s = new Date(Date.parse(t + 'Z') - 3600e3).toISOString();
+      const d = s.slice(0, 10);
+      if (!map.has(d)) map.set(d, Array.from({ length: 24 }, () => ({ p: null, prob: null })));
+      map.get(d)[Number(s.slice(11, 13))] = { p: pr[i], prob: pp?.[i] ?? null };
+    });
+    return map;
+  }
   function level(h) {
     if (!(h > 0)) return 0;
     if (h <= 2) return 1;
@@ -265,13 +305,17 @@
   function writeJSON(key, val) {
     try { localStorage.setItem(key, JSON.stringify(val)); } catch { /* bộ nhớ đầy / bị chặn */ }
   }
+  /** Lưu các ngày đã qua từ dữ liệu trực tuyến – chỉ điền ngày mà kho GitHub chưa có. */
   function mergeArchive(data) {
     const today = vnNow().date;
     const archive = readJSON(K_ARCHIVE, {});
-    const { time, precipitation_hours: ph } = data.daily;
-    time.forEach((d, i) => {
-      if (d < today && ph[i] != null) archive[d] = ph[i]; // chỉ lưu các ngày đã kết thúc
-    });
+    const byDate = hourlyByDate(data);
+    for (const [d, cells] of byDate) {
+      if (d >= today || archive[d]?.gh) continue; // chỉ lưu các ngày đã kết thúc
+      const mm = cells.map((c) => c.p);
+      if (mm.some((v) => v == null)) continue;
+      archive[d] = { h: mm.filter((v) => v >= RAIN_MM).length, p: toPeriods(mm) };
+    }
     writeJSON(K_ARCHIVE, archive);
   }
 
@@ -286,7 +330,8 @@
         if (!Array.isArray(db.days)) continue;
         const archive = readJSON(K_ARCHIVE, {});
         for (const d of db.days) {
-          if (d.date < today && d.hours != null && !(d.date in archive)) archive[d.date] = d.hours;
+          // Kho GitHub (ECMWF IFS 9 km) được ưu tiên hơn dữ liệu trình duyệt tự ghi.
+          if (d.date < today && d.hours != null) archive[d.date] = { h: d.hours, p: d.periods ?? null, gh: 1 };
         }
         writeJSON(K_ARCHIVE, archive);
         state.history = { count: db.days.length, from: db.days[0]?.date, updatedAt: db.updatedAt };
@@ -336,38 +381,39 @@
     const today = vnNow().date;
     const map = new Map();
     for (const [d, v] of Object.entries(readJSON(K_ARCHIVE, {}))) {
-      if (d < today) map.set(d, { date: d, hours: v, type: 'past' });
+      if (d < today) map.set(d, { date: d, hours: v.h, periods: v.p, type: 'past' });
     }
     if (state.data) {
+      const byDate = hourlyByDate(state.data);
       const { time, precipitation_hours: ph } = state.data.daily;
       time.forEach((d, i) => {
         if (d >= today && ph[i] != null) {
-          map.set(d, { date: d, hours: ph[i], type: d === today ? 'today' : 'forecast' });
+          const mm = (byDate.get(d) ?? []).map((c) => c.p);
+          map.set(d, { date: d, hours: ph[i], periods: toPeriods(mm), type: d === today ? 'today' : 'forecast' });
         }
       });
     }
     return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
   }
 
-  /** 24 ô giờ của hôm nay. Giá trị tại mốc hh:00 = mưa trong 1 giờ trước đó. */
+  /** 24 ô giờ của hôm nay, ô hr = khoảng hr:00–(hr+1):00. */
   function todayHours() {
     if (!state.data) return [];
     const { date, hour } = vnNow();
-    const h = state.data.hourly;
-    const cells = [];
-    h.time.forEach((t, i) => {
-      if (!t.startsWith(date)) return;
-      const hr = Number(t.slice(11, 13));
-      cells.push({
-        hr,
-        p: h.precipitation[i] ?? 0,
-        prob: h.precipitation_probability?.[i] ?? null,
-        past: hr <= hour,
-        now: hr === hour,
-      });
-    });
-    return cells;
+    const cells = hourlyByDate(state.data).get(date);
+    if (!cells) return [];
+    return cells.map((c, hr) => ({
+      hr,
+      p: c.p ?? 0,
+      prob: c.prob,
+      past: hr < hour,
+      now: hr === hour,
+    }));
   }
+  /** Khung giờ đã mưa hôm nay (chỉ tính các giờ đã kết thúc). */
+  const todayPastPeriods = () => toPeriods(todayHours().map((c) => (c.past ? c.p : 0)));
+  /** Khung giờ dự báo có mưa trong phần còn lại của hôm nay. */
+  const todayNextPeriods = () => toPeriods(todayHours().map((c) => (c.past ? 0 : c.p)));
 
   // ================== HIỂN THỊ ==================
   function renderStatus() {
@@ -398,8 +444,9 @@
     }
     const soFar = cells.filter((c) => c.past && c.p > 0).length;
     const p = parts(date);
+    const donePs = todayPastPeriods(), nextPs = todayNextPeriods();
     const strip = cells.map((c) => {
-      const from = pad((c.hr + 23) % 24), to = pad(c.hr);
+      const from = pad(c.hr), to = pad(c.hr + 1);
       let cls = 'h', style = '', tip;
       if (c.past) {
         if (c.p > 0) { cls += ' rain'; tip = `${from}:00–${to}:00: có mưa (${fmtNum(c.p)} mm)`; }
@@ -425,6 +472,10 @@
       <div class="big">${soFar}<small>giờ đã có mưa</small></div>
       <div class="muted small">Tính đến ${pad(hour)}:00 hôm nay</div>
       <div class="expect">Dự kiến cả ngày: <b>${fmtNum(todayRow.hours)} giờ mưa</b></div>
+      <div class="periods">
+        <div><span class="muted">Đã mưa:</span> ${donePs.length ? `<b>${fmtPeriods(donePs)}</b>` : 'chưa có'}</div>
+        <div><span class="muted">Dự báo còn lại:</span> ${nextPs.length ? fmtPeriods(nextPs, false) : 'không mưa'}</div>
+      </div>
       <div class="hours" role="img" aria-label="Diễn biến mưa theo giờ hôm nay">${strip}</div>
       <div class="hlabels" aria-hidden="true">${labels}</div>
       <div class="legend">
@@ -558,15 +609,19 @@
       const v = val(d);
       const lv = level(isToday ? d.hours : v);
       const w = Math.min(100, (v / 24) * 100);
+      const ps = isToday ? todayPastPeriods() : d.periods;
+      const per = ps == null ? '<span class="muted">–</span>'
+        : ps.length ? ps.map((x) => `${hh(x[0])}–${hh(x[1])}`).join('<br>') : '<span class="muted">Không mưa</span>';
       return `<tr class="${isToday ? 'is-today' : ''}">
         <td>${WEEKDAY[p.wd]}<div class="small muted">${fmtDMY(d.date)}</div></td>
         <td class="num">${fmtNum(v)} giờ${isToday ? `<div class="small muted" style="font-weight:400">dự kiến ${fmtNum(d.hours)} giờ</div>` : ''}</td>
+        <td class="per" title="${ps?.length ? fmtPeriods(ps) : ''}">${per}</td>
         <td class="col-bar"><div class="bar"><span style="width:${w}%;background:${LEVEL_COLOR[lv] === LEVEL_COLOR[0] ? 'transparent' : LEVEL_COLOR[lv]}"></span></div></td>
         <td><span class="tag">${isToday ? 'Đang diễn ra' : LEVEL_TEXT[lv]}</span></td>
       </tr>`;
     }).join('');
     $('#tableBox').innerHTML = `<table>
-      <thead><tr><th>Ngày</th><th>Số giờ mưa</th><th class="col-bar">Tỷ lệ trong 24 giờ</th><th>Mức độ</th></tr></thead>
+      <thead><tr><th>Ngày</th><th>Số giờ mưa</th><th>Khung giờ mưa</th><th class="col-bar">Tỷ lệ trong 24 giờ</th><th>Mức độ</th></tr></thead>
       <tbody>${body}</tbody></table>`;
   }
 
@@ -592,11 +647,13 @@
     const { date } = vnNow();
     const soFar = todayHours().filter((c) => c.past && c.p > 0).length;
     const rows = buildDays().filter((d) => d.type !== 'forecast');
-    const lines = ['Ngay,Thu,So gio mua,Ghi chu'];
+    const lines = ['Ngay,Thu,So gio mua,Khung gio mua,Ghi chu'];
     rows.forEach((d) => {
       const p = parts(d.date);
       const isToday = d.date === date;
+      const ps = isToday ? todayPastPeriods() : d.periods;
       lines.push([fmtDMY(d.date), WEEKDAY[p.wd], isToday ? soFar : d.hours,
+        ps ? ps.map((x) => `${hh(x[0])}-${hh(x[1])}`).join('; ') : '',
         isToday ? `Tinh den ${pad(vnNow().hour)}:00 - du kien ${d.hours} gio` : ''].join(','));
     });
     const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
