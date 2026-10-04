@@ -1,0 +1,47 @@
+name: Cập nhật số giờ mưa hằng ngày
+
+on:
+  schedule:
+    # 17:30 UTC = 00:30 giờ Việt Nam (GitHub có thể chạy trễ vài phút đến vài chục phút)
+    - cron: '30 17 * * *'
+  workflow_dispatch:
+    inputs:
+      backfill_from:
+        description: 'Bổ sung dữ liệu cũ từ ngày (YYYY-MM-DD). Để trống nếu không cần.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cap-nhat-so-gio-mua
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Lấy số giờ mưa từ Open-Meteo
+        env:
+          BACKFILL_FROM: ${{ github.event.inputs.backfill_from }}
+        run: node scripts/cap-nhat-mua.mjs
+
+      - name: Lưu (commit) nếu có thay đổi
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "Không có thay đổi."
+            exit 0
+          fi
+          git commit -m "Số giờ mưa: cập nhật $(TZ=Asia/Ho_Chi_Minh date +%F)"
+          git push
