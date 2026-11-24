@@ -10,8 +10,8 @@
   "ecmwf_ifs": "Open-Meteo Historical Weather API – ECMWF IFS HRES 9 km, mưa từng giờ",
   "era5_land": "Open-Meteo Historical Weather API – tái phân tích ERA5-Land 0,1°"
  },
- "updatedAt": "2026-11-17T00:55:58.909Z",
- "count": 2512,
+ "updatedAt": "2026-11-24T03:24:34.705Z",
+ "count": 2519,
  "days": [
   {"date":"2020-01-01","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
   {"date":"2020-01-02","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
@@ -2524,6 +2524,13 @@
   {"date":"2026-11-13","hours":13,"mm":5.8,"periods":[[3,5,0.6],[7,8,0.1],[11,21,5.1]],"source":"ecmwf_ifs"},
   {"date":"2026-11-14","hours":8,"mm":2.5,"periods":[[12,20,2.5]],"source":"ecmwf_ifs"},
   {"date":"2026-11-15","hours":8,"mm":6.1,"periods":[[9,17,6.1]],"source":"ecmwf_ifs"},
-  {"date":"2026-11-16","hours":1,"mm":0.2,"periods":[[13,14,0.2]],"source":"ecmwf_ifs"}
+  {"date":"2026-11-16","hours":1,"mm":0.2,"periods":[[13,14,0.2]],"source":"ecmwf_ifs"},
+  {"date":"2026-11-17","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
+  {"date":"2026-11-18","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
+  {"date":"2026-11-19","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
+  {"date":"2026-11-20","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
+  {"date":"2026-11-21","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
+  {"date":"2026-11-22","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
+  {"date":"2026-11-23","hours":1,"mm":0.1,"periods":[[16,17,0.1]],"source":"ecmwf_ifs"}
  ]
 }
