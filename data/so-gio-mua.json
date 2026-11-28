@@ -10,8 +10,8 @@
   "ecmwf_ifs": "Open-Meteo Historical Weather API – ECMWF IFS HRES 9 km, mưa từng giờ",
   "era5_land": "Open-Meteo Historical Weather API – tái phân tích ERA5-Land 0,1°"
  },
- "updatedAt": "2026-11-27T01:05:58.646Z",
- "count": 2522,
+ "updatedAt": "2026-11-28T00:37:58.913Z",
+ "count": 2523,
  "days": [
   {"date":"2020-01-01","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
   {"date":"2020-01-02","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
@@ -2534,6 +2534,7 @@
   {"date":"2026-11-23","hours":1,"mm":0.1,"periods":[[16,17,0.1]],"source":"ecmwf_ifs"},
   {"date":"2026-11-24","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
   {"date":"2026-11-25","hours":0,"mm":0,"periods":[],"source":"ecmwf_ifs"},
-  {"date":"2026-11-26","hours":7,"mm":2.5,"periods":[[10,17,2.5]],"source":"ecmwf_ifs"}
+  {"date":"2026-11-26","hours":7,"mm":2.5,"periods":[[10,17,2.5]],"source":"ecmwf_ifs"},
+  {"date":"2026-11-27","hours":12,"mm":20.6,"periods":[[5,8,2.6],[13,14,0.4],[15,18,0.5],[19,24,17.1]],"source":"ecmwf_ifs"}
  ]
 }
